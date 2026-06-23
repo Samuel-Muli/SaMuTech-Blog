@@ -1,0 +1,26 @@
+{
+  "name": "samutech-blog",
+  "version": "1.0.0",
+  "description": "Mern app for my blog",
+  "main": "server.js",
+  "scripts": {
+    "server": "nodemon server",
+    "client": "npm start --prefix client",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "npm install --prefix client && npm run build --prefix client",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "Samuel Muli",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongodb": "^7.3.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "nodemon": "^3.1.14"
+  }
+}
