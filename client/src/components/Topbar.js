@@ -15,7 +15,7 @@ const Topbar = () => {
           <span className="hidden sm:inline text-slate-500"> · new posts weekly</span>
         </p>
         <a
-          href="https://github.com/Samuel-Muli/SaMuTech"
+          href="https://github.com/Samuel-Muli/SaMuTech-Blog"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors shrink-0 ml-4"

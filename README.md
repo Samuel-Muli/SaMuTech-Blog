@@ -17,7 +17,8 @@ into a monetized blog (ads, affiliates, a newsletter) without a rebuild.
 |---|---|
 | Frontend | React 19, React Router 7, Tailwind CSS 3 |
 | Backend | Node.js, Express 5 |
-| Database | MongoDB (comments only — article content is static, see [Data model](#data-model)) |
+| Database | MongoDB (comments + subscribers — article content itself is static, see [Data model](#data-model)) |
+| Email (optional) | Nodemailer, for new-subscriber notifications |
 | Dev tooling | Create React App (`react-scripts`), nodemon, concurrently |
 
 Built and tested with Node `v22.x` / npm `10.x`. Anything Node 18+ should work fine.
@@ -29,21 +30,33 @@ Built and tested with Node `v22.x` / npm `10.x`. Anything Node 18+ should work f
 - Live search on the articles list, plus a search box on every other page
   that jumps to the list with results applied
 - Topic/tag filtering, linked from the sidebar, footer, and each article
-- Per-article comments, backed by MongoDB
+- Comments, backed by MongoDB, with:
+  - one top-level comment per device (IP-based) per article, to discourage spam
+  - like/unlike, edit, delete, and one-level-deep replies
+  - a clear error state (the form dims and shows a message) if the database
+    is unreachable when posting, and a success state + auto-scroll when a
+    comment posts successfully
+- An "other articles you may like" section on each article that shows up to
+  8 related posts: the 4 with the most comments, plus 4 random picks from
+  the least-commented ones (see [Data model](#data-model) for how this is
+  computed)
+- A real subscriber list (MongoDB-backed), with an optional email
+  notification when someone new subscribes (see [Monetization](#monetization))
 - A 404 page, and a content layout designed for future ad/affiliate
   placements in the sidebar (see [Monetization](#monetization))
 
 ## Project structure
 
 ```
-SaMuTech/
-├── server.js              # Express API (comments) + serves the built React app in production
+SaMuTech-Blog/
+├── server.js              # Express API (comments, subscribers) + serves the built React app in production
+├── mailer.js               # optional new-subscriber email notification (no-ops if unconfigured)
 ├── package.json           # root scripts: dev, build, start
 ├── .env.example           # documents required environment variables
 └── client/                # React app (Create React App)
     ├── public/
     ├── src/
-    │   ├── components/    # Navbar, Topbar, Footer, Sidebar, Layout, Articles, comments
+    │   ├── components/    # Navbar, Topbar, Footer, Sidebar, Layout, Articles, comments, SubscribeForm
     │   ├── pages/         # Home, ArticleList, Article, About, NotFound, article-content.js
     │   └── App.js
     └── package.json       # client scripts: start, build
@@ -60,8 +73,8 @@ SaMuTech/
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/Samuel-Muli/SaMuTech.git
-cd SaMuTech
+git clone https://github.com/Samuel-Muli/SaMuTech-Blog.git
+cd SaMuTech-Blog
 
 # 2. Install backend dependencies (repo root)
 npm install
@@ -90,6 +103,8 @@ Defined in `.env.example`; copy it to `.env` for local use.
 | `MONGODB_URI` | No (defaults to `mongodb://localhost:27017`) | Your MongoDB connection string |
 | `PORT` | No (defaults to `8000`) | Port the Express server listens on |
 | `NODE_ENV` | No | Set to `production` to make Express serve the built React app — most hosts set this automatically |
+| `SMTP_USER` / `SMTP_PASS` | No | Sending account credentials, only needed if you want an email when someone subscribes (see [Monetization](#monetization)) |
+| `NOTIFY_EMAIL` | No (defaults to `samumutua93@gmail.com`) | Who receives the new-subscriber email, if SMTP is configured |
 
 ## Available scripts
 
@@ -103,17 +118,50 @@ Run from the repo root unless noted:
 | `npm run build` | Installs client dependencies and builds the production React bundle into `client/build` |
 | `npm start` | Starts the Express server only (used in production, after `npm run build`) |
 
+## API reference
+
+All comment/reply identity and ownership checks are based on the
+requester's IP address (`req.ip`) — there's no login system. That's a
+deliberate, lightweight tradeoff for a small blog: it's enough to stop
+casual spam and let people manage their own comments, but it isn't bulletproof
+(shared networks, VPNs, or a changed IP can affect it). Each response strips
+raw IPs before sending anything to the browser.
+
+| Method & path | What it does |
+|---|---|
+| `GET /api/articles/:name` | Returns an article's comments, shaped for the current requester (`isMine`, `likedByMe`, `hasCommented`) |
+| `POST /api/articles/:name/comments` | Adds a top-level comment. `409` if this IP already commented on this article |
+| `PUT /api/articles/:name/comments/:commentId` | Edits a comment or reply. `403` if you're not its author |
+| `DELETE /api/articles/:name/comments/:commentId` | Deletes a comment (and its replies) or a single reply. `403` if you're not its author |
+| `POST /api/articles/:name/comments/:commentId/like` | Toggles a like/unlike. One like per IP per comment |
+| `POST /api/articles/:name/comments/:commentId/replies` | Adds a reply to a top-level comment |
+| `GET /api/comment-counts` | Returns `{ "article-name": totalCount }` for every article — powers the related-articles ranking below |
+| `POST /api/subscribe` | Adds an email to the `subscribers` collection (idempotent — resubscribing returns a friendly message, not an error) |
+
 ## Data model
 
 Article *content* (title, body text, thumbnail, tags) lives as static data
 in `client/src/pages/article-content.js` — it's bundled into the frontend,
-not stored in a database. MongoDB is only used to store **comments**, in a
-`samutech` database, `articles` collection, where each document looks like:
+not stored in a database. MongoDB stores two things, in a `samutech`
+database:
+
+**`articles` collection** — comments per article:
 
 ```json
 {
   "name": "structural-engineering-101",
-  "comments": [{ "username": "Jane", "text": "Great breakdown!" }]
+  "comments": [
+    {
+      "id": "a5e1...",
+      "username": "Jane",
+      "text": "Great breakdown!",
+      "createdAt": "2026-06-23T10:00:00.000Z",
+      "editedAt": null,
+      "ip": "203.0.113.4",
+      "likedBy": ["203.0.113.9"],
+      "replies": []
+    }
+  ]
 }
 ```
 
@@ -124,6 +172,20 @@ comments yet just renders an empty comments section. Nothing to set up.
 To add a new article: add an entry to `article-content.js` with a unique
 `name`, `title`, `thumbnail`, `tags` array, and `content` array of
 paragraphs, and add its thumbnail image to `client/public/images/`.
+
+**`subscribers` collection** — one document per email:
+
+```json
+{ "email": "reader@example.com", "subscribedAt": "2026-06-23T10:00:00.000Z" }
+```
+
+**Related articles ranking:** each article page fetches `/api/comment-counts`
+and picks up to 8 "other articles you may like" — the 4 with the most total
+comments (comments + replies), and 4 random picks from the least-commented
+ones (so that group isn't the same 4 every time). With fewer than 8 other
+articles in `article-content.js` (true today — there are only 4 total), it
+just shows what's available rather than padding or repeating; you'll see
+the full 8-article spread once there are more posts.
 
 ---
 
@@ -169,6 +231,10 @@ free or low-cost tiers well suited to a small Node app. Using Render:
    |---|---|
    | `MONGODB_URI` | your Atlas connection string from step 1 |
    | `NODE_ENV` | `production` |
+
+   Optionally, also add `SMTP_USER`, `SMTP_PASS`, and `NOTIFY_EMAIL` here if
+   you want new-subscriber email notifications (see [Monetization](#monetization)).
+   Skip them and subscribers still get saved — you just won't be emailed.
 5. Deploy. Render gives you a free `*.onrender.com` URL — that's your live
    site.
 
@@ -243,21 +309,33 @@ monetization seriously.
 
 ### The newsletter
 
-Both the `Footer` and `Sidebar` already have a working subscribe form —
-right now it only confirms locally ("You're on the list — thanks!") because
-there's no email service wired up yet. When you're ready to actually
-collect subscribers, swap that local state for a real call to a provider
-like [Mailchimp](https://mailchimp.com), [ConvertKit](https://convertkit.com),
-or [Buttondown](https://buttondown.email) — a list of engaged subscribers
-is also one of the more durable monetization assets a blog can build,
-independent of any single ad network or platform.
+Both the `Footer` and `Sidebar` subscribe forms are real now — they call
+`POST /api/subscribe`, which stores each email in MongoDB's `subscribers`
+collection (see [Data model](#data-model)). That's already a genuine asset:
+a list of engaged subscribers, independent of any single ad network or
+platform, and one of the more durable ways a small blog can monetize.
+
+What this **doesn't** do yet is send anything to subscribers — there's no
+broadcast/campaign feature. When you're ready to actually email your list,
+export from MongoDB and import into a provider like
+[Mailchimp](https://mailchimp.com), [ConvertKit](https://convertkit.com), or
+[Buttondown](https://buttondown.email), which handle composing, sending, and
+unsubscribe links properly (don't build that part yourself — deliverability
+and compliance, like CAN-SPAM/unsubscribe requirements, are exactly what
+those tools are for).
+
+There's also an optional notification email — whoever's set as
+`NOTIFY_EMAIL` (defaults to `samumutua93@gmail.com`) gets pinged whenever
+someone new subscribes, if `SMTP_USER`/`SMTP_PASS` are configured (see
+`.env.example`). Leave those unset and subscribers still get saved — you
+just won't be emailed about each one.
 
 ---
 
 ## Contributing
 
 Issues and pull requests are welcome — open one on
-[GitHub](https://github.com/Samuel-Muli/SaMuTech).
+[GitHub](https://github.com/Samuel-Muli/SaMuTech-Blog).
 
 ## License
 

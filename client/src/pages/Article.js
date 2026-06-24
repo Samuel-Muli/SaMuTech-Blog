@@ -1,7 +1,6 @@
-import React from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import articleContent from "./article-content"; // Import the article content
-import { useState, useEffect } from "react";
 
 //components
 import Articles from "../components/Articles";
@@ -17,28 +16,98 @@ const readTime = (paragraphs) => {
   return Math.max(1, Math.round(words / 200));
 };
 
+// Fisher-Yates shuffle — used to randomize which low-engagement articles show.
+const shuffle = (arr) => {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
+// Up to 8 related articles: the 4 with the most comments, plus 4 random
+// picks from the least-commented ones. With fewer than 8 other articles
+// available, it just returns what there is — nothing crashes, it simply
+// won't fill all 8 slots until there's more content.
+const pickRelatedArticles = (otherArticles, commentCounts) => {
+  const withCounts = otherArticles.map((a) => ({
+    ...a,
+    commentCount: commentCounts[a.name] || 0,
+  }));
+
+  const sortedDesc = [...withCounts].sort((a, b) => b.commentCount - a.commentCount);
+  const mostCommented = sortedDesc.slice(0, 4);
+  const mostNames = new Set(mostCommented.map((a) => a.name));
+
+  const remaining = withCounts.filter((a) => !mostNames.has(a.name));
+  const sortedAsc = [...remaining].sort((a, b) => a.commentCount - b.commentCount);
+  const lowPoolSize = Math.max(4, Math.min(8, remaining.length));
+  const leastCommented = shuffle(sortedAsc.slice(0, lowPoolSize)).slice(0, 4);
+
+  return [...mostCommented, ...leastCommented];
+};
+
+const EMPTY_ARTICLE_INFO = { comments: [], hasCommented: false };
+
 const Article = () => {
   const { name } = useParams();
-  const article = articleContent.find((article) => article.name === name);
-  const [articleInfo, setArticleInfo] = useState({ comments: [] });
+  const article = articleContent.find((a) => a.name === name);
+  const [articleInfo, setArticleInfo] = useState(EMPTY_ARTICLE_INFO);
+  const [commentsUnavailable, setCommentsUnavailable] = useState(false);
+  const [commentCounts, setCommentCounts] = useState({});
+  const commentsRef = useRef(null);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchData = async () => {
       try {
         const result = await fetch(`/api/articles/${name}`);
+        if (!result.ok) throw new Error("Request failed");
         const body = await result.json();
-        setArticleInfo(Array.isArray(body?.comments) ? body : { comments: [] });
+        if (cancelled) return;
+        setArticleInfo(Array.isArray(body?.comments) ? body : EMPTY_ARTICLE_INFO);
+        setCommentsUnavailable(false);
       } catch (err) {
-        setArticleInfo({ comments: [] });
+        if (cancelled) return;
+        setArticleInfo(EMPTY_ARTICLE_INFO);
+        setCommentsUnavailable(true);
       }
     };
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [name]);
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const result = await fetch("/api/comment-counts");
+        const body = await result.json();
+        setCommentCounts(body && typeof body === "object" ? body : {});
+      } catch (err) {
+        setCommentCounts({});
+      }
+    };
+    fetchCounts();
+  }, []);
+
+  // All hooks above run on every render regardless of whether the article
+  // exists, so the early return below never changes hook call order.
+
+  const otherArticles = useMemo(
+    () => articleContent.filter((a) => a.name !== name),
+    [name]
+  );
+  const relatedArticles = useMemo(
+    () => pickRelatedArticles(otherArticles, commentCounts),
+    [otherArticles, commentCounts]
+  );
 
   if (!article) {
     return <NotFound />;
   }
-  const otherArticles = articleContent.filter((a) => a.name !== name);
 
   return (
     <>
@@ -84,9 +153,20 @@ const Article = () => {
           ))}
         </div>
 
-        <div className="mt-12 pt-10 border-t border-border">
-          <CommentList comments={articleInfo.comments} />
-          <AddCommentForm articleName={name} setArticleInfo={setArticleInfo} />
+        <div ref={commentsRef} className="mt-12 pt-10 border-t border-border">
+          <CommentList
+            comments={articleInfo.comments}
+            articleName={name}
+            onUpdate={setArticleInfo}
+            unavailable={commentsUnavailable}
+          />
+          <AddCommentForm
+            articleName={name}
+            hasCommented={articleInfo.hasCommented}
+            onUpdate={setArticleInfo}
+            onAlreadyCommented={() => setArticleInfo((prev) => ({ ...prev, hasCommented: true }))}
+            onPosted={() => commentsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          />
         </div>
       </PageWithSidebar>
 
@@ -95,7 +175,7 @@ const Article = () => {
           Other articles you may like
         </h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Articles articles={otherArticles} />
+          <Articles articles={relatedArticles} />
         </div>
       </div>
     </>

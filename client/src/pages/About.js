@@ -41,7 +41,7 @@ const About = () => {
             Got a topic you'd like covered, or feedback on an article?
             Open an issue on{" "}
             <a
-              href="https://github.com/Samuel-Muli/SaMuTech"
+              href="https://github.com/Samuel-Muli/SaMuTech-Blog"
               target="_blank"
               rel="noopener noreferrer"
               className="text-amber font-semibold hover:text-amber-light"

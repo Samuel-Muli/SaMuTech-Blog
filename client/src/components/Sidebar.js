@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import articleContent from "../pages/article-content";
+import SubscribeForm from "./SubscribeForm";
 
 const allTags = [...new Set(articleContent.flatMap((a) => a.tags || []))];
 
@@ -30,8 +31,6 @@ const Sidebar = ({ articles = [], searchValue, onSearchChange }) => {
   const navigate = useNavigate();
   const controlled = typeof onSearchChange === "function";
   const [localQuery, setLocalQuery] = useState("");
-  const [subscribed, setSubscribed] = useState(false);
-  const [email, setEmail] = useState("");
   const popular = articles.slice(0, 3);
 
   const inputValue = controlled ? searchValue : localQuery;
@@ -49,13 +48,6 @@ const Sidebar = ({ articles = [], searchValue, onSearchChange }) => {
     if (controlled) return; // already filtering live on this page
     const q = localQuery.trim();
     navigate(q ? `/articles-list?q=${encodeURIComponent(q)}` : "/articles-list");
-  };
-
-  const handleSubscribe = (e) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setSubscribed(true);
-    setEmail("");
   };
 
   return (
@@ -115,26 +107,7 @@ const Sidebar = ({ articles = [], searchValue, onSearchChange }) => {
         <p className="text-sm text-muted mb-4">
           One email a week. New tutorials, no fluff.
         </p>
-        {subscribed ? (
-          <p className="text-sm font-medium text-teal">You're on the list — thanks!</p>
-        ) : (
-          <form onSubmit={handleSubscribe} className="space-y-2">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@email.com"
-              className="w-full rounded-lg border border-border bg-paper px-3 py-2.5 text-sm text-ink placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber/40 focus:border-amber"
-            />
-            <button
-              type="submit"
-              className="w-full rounded-lg bg-ink px-3 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft transition-colors"
-            >
-              Subscribe
-            </button>
-          </form>
-        )}
+        <SubscribeForm variant="light" />
       </SidebarSection>
     </aside>
   );

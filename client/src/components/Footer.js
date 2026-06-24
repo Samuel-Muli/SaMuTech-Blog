@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import articleContent from "../pages/article-content";
+import SubscribeForm from "./SubscribeForm";
 
 const allTags = [...new Set(articleContent.flatMap((a) => a.tags || []))];
 
@@ -18,16 +19,6 @@ const FooterColumn = ({ label, children }) => (
 );
 
 const Footer = () => {
-  const [email, setEmail] = useState("");
-  const [subscribed, setSubscribed] = useState(false);
-
-  const handleSubscribe = (e) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setSubscribed(true);
-    setEmail("");
-  };
-
   return (
     <footer className="bg-ink text-slate-300 border-t-2 border-amber">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
@@ -45,7 +36,7 @@ const Footer = () => {
               Practical tutorials on React, Node.js, and shipping full-stack JavaScript apps.
             </p>
             <a
-              href="https://github.com/Samuel-Muli/SaMuTech"
+              href="https://github.com/Samuel-Muli/SaMuTech-Blog"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 mt-4 text-sm text-slate-300 hover:text-white transition-colors"
@@ -79,26 +70,7 @@ const Footer = () => {
           </FooterColumn>
 
           <FooterColumn label="stay updated">
-            {subscribed ? (
-              <p className="text-sm text-teal font-medium">You're on the list — thanks!</p>
-            ) : (
-              <form onSubmit={handleSubscribe} className="space-y-2">
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@email.com"
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber/50"
-                />
-                <button
-                  type="submit"
-                  className="w-full rounded-lg bg-amber px-3 py-2.5 text-sm font-semibold text-white hover:bg-amber-light transition-colors"
-                >
-                  Subscribe
-                </button>
-              </form>
-            )}
+            <SubscribeForm variant="dark" />
           </FooterColumn>
         </div>
 
