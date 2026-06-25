@@ -5,9 +5,8 @@ MongoDB (backend). Written and styled for tutorial-style content — articles,
 search, topic filtering, and reader comments — with a design built to grow
 into a monetized blog (ads, affiliates, a newsletter) without a rebuild.
 
-> 📸 _Add a screenshot of the homepage here once you've got it running —
-> drag an image into this section on GitHub, or replace this line with
-> `![SaMuTech homepage](./docs/screenshot.png)`._
+
+./docs/screenshot.png
 
 ---
 
