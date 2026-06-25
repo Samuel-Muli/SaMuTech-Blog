@@ -2,6 +2,7 @@ import React from "react";
 import Topbar from "./Topbar";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
+import FloatingActions from "./FloatingActions";
 
 const Layout = ({ children }) => {
   return (
@@ -10,6 +11,7 @@ const Layout = ({ children }) => {
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
+      <FloatingActions />
     </div>
   );
 };

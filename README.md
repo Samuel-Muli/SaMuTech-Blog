@@ -5,8 +5,9 @@ MongoDB (backend). Written and styled for tutorial-style content — articles,
 search, topic filtering, and reader comments — with a design built to grow
 into a monetized blog (ads, affiliates, a newsletter) without a rebuild.
 
-> ![SaMuTech homepage](./docs/screenshot.png)
-
+> 📸 _Add a screenshot of the homepage here once you've got it running —
+> drag an image into this section on GitHub, or replace this line with
+> `![SaMuTech homepage](./docs/screenshot.png)`._
 
 ---
 
@@ -39,8 +40,14 @@ Built and tested with Node `v22.x` / npm `10.x`. Anything Node 18+ should work f
   8 related posts: the 4 with the most comments, plus 4 random picks from
   the least-commented ones (see [Data model](#data-model) for how this is
   computed)
-- A real subscriber list (MongoDB-backed), with an optional email
-  notification when someone new subscribes (see [Monetization](#monetization))
+- A real subscriber list (MongoDB-backed), with one-click unsubscribe and
+  an optional email notification when someone new subscribes (see
+  [Monetization](#monetization)) — both gray out with a friendly message
+  rather than a raw error if the database is briefly unreachable
+- Navigating to a new page (including "other articles you may like") always
+  scrolls to the top, plus a floating "back to top" button on long pages
+- A floating WhatsApp contact button, and a row of social/contact links in
+  the footer
 - A 404 page, and a content layout designed for future ad/affiliate
   placements in the sidebar (see [Monetization](#monetization))
 
@@ -136,6 +143,7 @@ raw IPs before sending anything to the browser.
 | `POST /api/articles/:name/comments/:commentId/replies` | Adds a reply to a top-level comment |
 | `GET /api/comment-counts` | Returns `{ "article-name": totalCount }` for every article — powers the related-articles ranking below |
 | `POST /api/subscribe` | Adds an email to the `subscribers` collection (idempotent — resubscribing returns a friendly message, not an error) |
+| `DELETE /api/subscribe` | Removes an email from the `subscribers` collection (idempotent either way — same response whether or not it was actually subscribed) |
 
 ## Data model
 

@@ -294,6 +294,23 @@ app.post("/api/subscribe", async (req, res) => {
   }, res);
 });
 
+app.delete("/api/subscribe", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || !EMAIL_RE.test(String(email).trim())) {
+    return res.status(400).json({ message: "Please enter a valid email address." });
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+
+  withDB(async (db) => {
+    await db.collection("subscribers").deleteOne({ email: normalizedEmail });
+    // Same response whether or not the email was actually subscribed —
+    // no reason to reveal which emails are/aren't on the list.
+    res.status(200).json({ message: "You've been unsubscribed." });
+  }, res);
+});
+
 // In production, serve the built React app for any request that isn't
 // one of the API routes above (this is what lets the whole blog run as a
 // single deployed service).
